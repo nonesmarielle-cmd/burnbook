@@ -1337,44 +1337,62 @@ async function analyzeYoutubeWorkout() {
   render();
 
   try {
-    const overrideNote = minutesOverride
-      ? "The user says they actually did " + minutesOverride + " minutes of it (use this as the real duration performed, even if the full video is longer or shorter)."
-      : "The user did the full video, so use the video's actual runtime as the duration.";
+    const infoRes = await fetch(API_BASE + '/youtube-info?url=' + encodeURIComponent(url));
+    if (!infoRes.ok) throw new Error('Could not fetch video info');
+    const info = await infoRes.json();
+    if (info.error || (!info.title && !info.description)) {
+      state.activityError = "Couldn't read that video's info \u2014 double-check the link, or log the workout manually instead.";
+      state.activityLoading = false;
+      render();
+      return;
+    }
 
-    const systemPrompt = "You identify workout videos from a YouTube link using web search, then estimate calories burned. Search for the video to determine: the type of workout (e.g. running, HIIT, cycling, dance cardio, yoga, strength training, boxing) and its typical intensity, and the video's runtime in minutes. Pick the closest standard MET (metabolic equivalent) value for the workout's intensity. Calculate estimated calories burned as MET * body_weight_kg * (duration_minutes / 60), rounded to the nearest whole number. Respond with ONLY a raw JSON object as your final output, no markdown fences, no commentary before or after, in exactly this shape: {\"workout_name\": string, \"estimated_duration_minutes\": integer, \"met_value\": number, \"estimated_calories_burned\": integer}. If you cannot find or identify the video, set workout_name to \"Not found\" and estimated_calories_burned to 0.";
+    const videoDurationMinutes = info.lengthSeconds ? Math.round(info.lengthSeconds / 60) : null;
+    const knownDuration = minutesOverride ? parseInt(minutesOverride, 10) : videoDurationMinutes;
 
-    const userText = "YouTube link: " + url + "\nUser's body weight: " + state.weight + " kg\n" + overrideNote;
+    const systemPrompt = "You identify workout videos from YouTube metadata (title, channel name, and description text) and estimate calories burned. Determine the type of workout (e.g. running, HIIT, cycling, dance cardio, yoga, strength training, boxing, pilates) and its likely intensity from the metadata. Pick the closest standard MET (metabolic equivalent) value for that intensity. If the user's message specifies an exact duration to use, use that exact number for estimated_duration_minutes and for the calorie calculation \u2014 do not re-estimate it. Otherwise, estimate a typical duration for this kind of workout video from the metadata. Calculate estimated calories burned as MET * body_weight_kg * (duration_minutes / 60), rounded to the nearest whole number. Respond with ONLY a raw JSON object as your final output, no markdown fences, no commentary, in exactly this shape: {\"workout_name\": string, \"estimated_duration_minutes\": integer, \"met_value\": number, \"estimated_calories_burned\": integer}. If the metadata doesn't look like a workout video at all, set workout_name to \"Not found\" and estimated_calories_burned to 0.";
+
+    const durationInstruction = knownDuration
+      ? ("Use exactly " + knownDuration + " minutes as the duration performed.")
+      : "No exact duration is known \u2014 estimate a typical duration for this kind of workout video from the metadata.";
+
+    const userText = "Video title: " + (info.title || "unknown") +
+      "\nChannel: " + (info.author || "unknown") +
+      "\nDescription: " + (info.description ? info.description.slice(0, 1500) : "none available") +
+      "\nUser's body weight: " + state.weight + " kg\n" + durationInstruction;
 
     const response = await fetch(API_BASE + "/api/claude", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 1500,
+        max_tokens: 800,
         system: systemPrompt,
-        messages: [{ role: "user", content: userText }],
-        tools: [{ type: "web_search_20250305", name: "web_search" }]
+        messages: [{ role: "user", content: userText }]
       })
     });
 
     const data = await response.json();
-    const textBlocks = (data.content || []).filter(b => b.type === 'text');
-    if (textBlocks.length === 0) throw new Error('No response from model');
-    const lastText = textBlocks[textBlocks.length - 1].text;
-    let clean = lastText.trim().replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+    const textBlock = (data.content || []).find(b => b.type === 'text');
+    if (!textBlock) throw new Error('No response from model');
+    let clean = textBlock.text.trim().replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
     const parsed = JSON.parse(clean);
 
     if (!parsed.workout_name || typeof parsed.estimated_calories_burned !== 'number') {
       throw new Error('Could not read the result.');
     }
     if (parsed.workout_name === 'Not found' || parsed.estimated_calories_burned === 0) {
-      state.activityError = "Couldn't identify that workout video. Try pasting a different link, or log it manually instead.";
+      state.activityError = "That doesn't look like a workout video based on its title/description. Try a different link, or log it manually instead.";
       state.activityLoading = false;
       render();
       return;
     }
 
-    const durationLabel = minutesOverride ? (minutesOverride + ' min (of a ' + parsed.estimated_duration_minutes + ' min video)') : (parsed.estimated_duration_minutes + ' min video');
+    const finalMinutes = knownDuration || parsed.estimated_duration_minutes;
+    const durationLabel = minutesOverride
+      ? (minutesOverride + ' min (of a ' + (videoDurationMinutes || parsed.estimated_duration_minutes) + ' min video)')
+      : (videoDurationMinutes ? (finalMinutes + ' min video') : (finalMinutes + ' min, estimated'));
+
     state.activities.push({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       name: parsed.workout_name,
