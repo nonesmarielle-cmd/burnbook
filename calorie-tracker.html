@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Portion</title>
+<style>
+  @font-face {
+    font-family: 'JetBrains Mono';
+    src: local('JetBrains Mono');
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #131311;
+    color: #EFEDE4;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+    overscroll-behavior-y: none;
+  }
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding: 0 0 100px;
+    position: relative;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 20px 8px;
+  }
+  .header .date {
+    font-size: 13px;
+    color: #8C897C;
+    letter-spacing: 0.02em;
+  }
+  .header .title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #EFEDE4;
+    letter-spacing: 0.01em;
+  }
+  .icon-btn {
+    background: none;
+    border: none;
+    color: #8C897C;
+    padding: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .gauge-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 20px 24px;
+  }
+  .gauge-center {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .gauge-remaining {
+    font-size: 42px;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .gauge-label {
+    font-size: 11px;
+    color: #8C897C;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 6px;
+  }
+  .gauge-sub {
+    display: flex;
+    gap: 18px;
+    margin-top: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .gauge-sub .stat-label { color: #66655C; }
+  .gauge-sub .stat-val { color: #D8A857; margin-left: 4px; }
+  .section-label {
+    font-size: 11px;
+    color: #66655C;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0 20px;
+    margin: 10px 0 8px;
+  }
+  .meal-group-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0 20px;
+    margin: 14px 0 8px;
+  }
+  .meal-group-label span:first-child {
+    font-size: 12px;
+    font-weight: 500;
+    color: #C7C4B7;
+  }
+  .meal-group-label span:last-child {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #66655C;
+  }
+  .log {
+    padding: 0 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .entry {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #1C1B17;
+    border: 1px solid #26251F;
+    border-radius: 12px;
+    padding: 10px;
+  }
+  .entry img {
+    width: 48px; height: 48px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #26251F;
+  }
+  .entry-info { flex: 1; min-width: 0; }
+  .entry-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #EFEDE4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .entry-portion {
+    font-size: 12px;
+    color: #8C897C;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+  .entry-cals {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: #D8A857;
+    flex-shrink: 0;
+  }
+  .entry-del {
+    background: none;
+    border: none;
+    color: #4A493F;
+    padding: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .entry-del svg { width: 16px; height: 16px; }
+  .empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: #66655C;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .fab-row {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    max-width: 480px;
+  }
+  .fab {
+    width: 62px; height: 62px;
+    border-radius: 50%;
+    background: #D8A857;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+    flex-shrink: 0;
+  }
+  .fab svg { width: 26px; height: 26px; color: #131311; }
+  .fab:active { transform: scale(0.95); }
+  .fab-secondary {
+    background: #1C1B17;
+    border: 1px solid #3A3928;
+    width: 50px; height: 50px;
+  }
+  .fab-secondary svg { width: 21px; height: 21px; color: #D8A857; }
+  .fab-secondary:active { transform: scale(0.95); }
+  .activity-icon {
+    width: 48px; height: 48px;
+    border-radius: 8px;
+    background: #26251F;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .activity-icon svg { width: 20px; height: 20px; color: #D8A857; }
+  .entry-cals.burn { color: #7FB88A; }
+  .tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .tab-btn {
+    flex: 1;
+    background: #131311;
+    border: 1px solid #33322A;
+    color: #8C897C;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 9px 6px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .tab-btn.active {
+    border-color: #D8A857;
+    color: #D8A857;
+  }
+  .sheet label {
+    font-size: 12px;
+    color: #8C897C;
+    display: block;
+    margin: 12px 0 6px;
+  }
+  .sheet label:first-of-type { margin-top: 0; }
+  .sheet select, .sheet input[type=text] {
+    width: 100%;
+    background: #131311;
+    border: 1px solid #33322A;
+    color: #EFEDE4;
+    font-size: 14px;
+    border-radius: 10px;
+    padding: 11px 12px;
+  }
+  .hint {
+    font-size: 11px;
+    color: #66655C;
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+  .page-nav {
+    display: flex;
+    gap: 8px;
+    padding: 0 20px 16px;
+  }
+  .page-nav .tab-btn {
+    padding: 10px 6px;
+  }
+  .cal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px 16px;
+  }
+  .cal-month {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .cal-nav-btn {
+    background: none;
+    border: none;
+    color: #8C897C;
+    padding: 6px;
+    cursor: pointer;
+    display: flex;
+  }
+  .cal-nav-btn svg { width: 18px; height: 18px; }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    padding: 0 20px 24px;
+  }
+  .cal-dow {
+    font-size: 10px;
+    color: #66655C;
+    text-align: center;
+    text-transform: uppercase;
+    padding-bottom: 4px;
+    letter-spacing: 0.04em;
+  }
+  .cal-day {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    background: #1C1B17;
+    border: 1px solid #26251F;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .cal-day.empty { background: transparent; border-color: transparent; }
+  .cal-day .d-num { font-size: 10px; color: #66655C; }
+  .cal-day .d-cal { font-size: 11px; font-weight: 500; color: #8C897C; }
+  .cal-day.under { border-color: #2E4A33; background: #182018; }
+  .cal-day.under .d-cal { color: #7FB88A; }
+  .cal-day.over { border-color: #4A3320; background: #241A15; }
+  .cal-day.over .d-cal { color: #D8756A; }
+  .cal-day.today-cell { border-color: #D8A857; border-width: 1.5px; }
+  .cal-legend {
+    display: flex;
+    gap: 16px;
+    padding: 0 20px 20px;
+    font-size: 11px;
+    color: #66655C;
+  }
+  .cal-legend span { display: flex; align-items: center; gap: 6px; }
+  .cal-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,8,0.85);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 20;
+  }
+  .sheet {
+    width: 100%;
+    max-width: 480px;
+    background: #1C1B17;
+    border-radius: 20px 20px 0 0;
+    padding: 22px 20px calc(22px + env(safe-area-inset-bottom));
+  }
+  .sheet-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .sheet input[type=number] {
+    width: 100%;
+    background: #131311;
+    border: 1px solid #33322A;
+    color: #EFEDE4;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .sheet-row { display: flex; gap: 10px; margin-top: 16px; }
+  .btn {
+    flex: 1;
+    border-radius: 10px;
+    padding: 13px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-primary { background: #D8A857; color: #131311; }
+  .btn-secondary { background: transparent; color: #8C897C; border: 1px solid #33322A; }
+  .loading-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    gap: 14px;
+    color: #8C897C;
+    font-size: 13px;
+  }
+  .spinner {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid #33322A;
+    border-top-color: #D8A857;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .analyzed-preview {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .analyzed-preview img {
+    width: 64px; height: 64px;
+    border-radius: 10px;
+    object-fit: cover;
+  }
+  .analyzed-name { font-size: 15px; font-weight: 600; }
+  .analyzed-portion { font-size: 12px; color: #8C897C; margin-top: 3px; }
+  .analyzed-cals {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 26px;
+    color: #D8A857;
+    margin-top: 2px;
+  }
+  .err {
+    background: #2A1E17;
+    border: 1px solid #4A3320;
+    color: #E0A56E;
+    font-size: 13px;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .profile-page {
+    padding: 60px 24px 24px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .profile-title { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .profile-sub { font-size: 13px; color: #8C897C; margin-bottom: 28px; }
+  .profile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .profile-btn {
+    text-align: left;
+    background: #1C1B17;
+    border: 1px solid #33322A;
+    color: #EFEDE4;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 13px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .profile-btn:active { transform: scale(0.98); }
+  .profile-page label {
+    font-size: 12px;
+    color: #8C897C;
+    display: block;
+    margin: 4px 0 6px;
+  }
+  .profile-page input[type=text] {
+    width: 100%;
+    background: #1C1B17;
+    border: 1px solid #33322A;
+    color: #EFEDE4;
+    font-size: 14px;
+    border-radius: 10px;
+    padding: 11px 12px;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<input type="file" id="fileInput" accept="image/*" capture="environment" style="display:none">
+
+<script>
+const API_BASE = 'https://caloriecounter-api.nonesmarielle.workers.dev';
+
+async function kvGet(key) {
+  try {
+    const res = await fetch(API_BASE + '/kv/' + encodeURIComponent(key));
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error('kv get failed');
+    const value = await res.text();
+    return { value };
+  } catch(e) { return null; }
+}
+
+async function kvSet(key, value) {
+  try {
+    const res = await fetch(API_BASE + '/kv/' + encodeURIComponent(key), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'text/plain' },
+      body: value
+    });
+    return res.ok;
+  } catch(e) { return false; }
+}
+
+async function kvList(prefix) {
+  try {
+    const res = await fetch(API_BASE + '/kv-list?prefix=' + encodeURIComponent(prefix));
+    if (!res.ok) return { keys: [] };
+    const data = await res.json();
+    return { keys: data.keys || [] };
+  } catch(e) { return { keys: [] }; }
+}
+
+const state = {
+  limit: 2000,
+  weight: 70,
+  entries: [],
+  activities: [],
+  steps: 0,
+  view: null,
+  pendingImage: null,
+  pendingResult: null,
+  pendingMealType: 'snack',
+  loading: false,
+  error: null,
+  limitDraft: 2000,
+  weightDraft: 70,
+  activityTab: 'steps',
+  stepsDraft: 0,
+  workoutType: 'running',
+  workoutMinutes: 30,
+  ytUrlDraft: '',
+  ytMinutesDraft: '',
+  activityLoading: false,
+  activityError: null,
+  page: 'today',
+  calendarMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  calendarData: {},
+  calendarLoading: false,
+  profile: null,
+  profilesList: [],
+  profileError: null,
+  booting: true
+};
+
+const MET_TABLE = {
+  walking: { label: 'Walking', met: 3.8 },
+  running: { label: 'Running', met: 9.8 },
+  cycling: { label: 'Cycling', met: 7.5 },
+  weights: { label: 'Weight training', met: 5.0 },
+  yoga: { label: 'Yoga', met: 3.0 },
+  hiit: { label: 'HIIT', met: 8.0 },
+  swimming: { label: 'Swimming', met: 7.0 },
+  dancing: { label: 'Dance workout', met: 5.5 },
+  boxing: { label: 'Boxing / kickboxing', met: 7.8 }
+};
+
+function todayKey() {
+  const d = new Date();
+  return 'log:' + state.profile + ':' + d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function activityKey() {
+  const d = new Date();
+  return 'activity:' + state.profile + ':' + d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function settingsKey() {
+  return 'settings:' + state.profile;
+}
+
+function currentProfileName() {
+  const p = state.profilesList.find(x => x.slug === state.profile);
+  return p ? p.name : '';
+}
+
+function todayDateStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function monthPrefix(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function defaultMealType() {
+  const h = new Date().getHours();
+  if (h < 11) return 'breakfast';
+  if (h < 15) return 'lunch';
+  if (h < 19) return 'dinner';
+  return 'snack';
+}
+
+function slugify(name) {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+async function boot() {
+  await loadProfilesList();
+  let saved = null;
+  try {
+    saved = localStorage.getItem('current-profile') || null;
+  } catch(e) {}
+  if (saved && state.profilesList.some(p => p.slug === saved)) {
+    state.profile = saved;
+    state.booting = false;
+    await loadState();
+  } else {
+    state.profile = null;
+    state.booting = false;
+    render();
+  }
+}
+
+async function loadProfilesList() {
+  try {
+    const r = await kvGet('profiles-list');
+    if (r && r.value) state.profilesList = JSON.parse(r.value);
+  } catch(e) { state.profilesList = []; }
+}
+
+async function saveProfilesList() {
+  try { await kvSet('profiles-list', JSON.stringify(state.profilesList)); }
+  catch(e) { console.error('save profiles list failed', e); }
+}
+
+async function selectProfile(slug) {
+  state.profile = slug;
+  state.profileError = null;
+  try { localStorage.setItem('current-profile', slug); } catch(e) {}
+  await loadState();
+}
+
+async function createProfile() {
+  const input = document.getElementById('newProfileInput');
+  const name = input.value.trim();
+  if (!name) return;
+  const slug = slugify(name);
+  if (!slug) return;
+  if (state.profilesList.some(p => p.slug === slug)) {
+    state.profileError = 'That name is taken already \u2014 try adding an initial, e.g. "Marielle B".';
+    render();
+    return;
+  }
+  state.profilesList.push({ slug, name });
+  await saveProfilesList();
+  await selectProfile(slug);
+}
+
+function switchProfile() {
+  state.profile = null;
+  state.profileError = null;
+  try { localStorage.removeItem('current-profile'); } catch(e) {}
+  state.view = null;
+  render();
+}
+
+function fmtDate() {
+  return new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+async function loadState() {
+  state.limit = 2000;
+  state.weight = 70;
+  state.entries = [];
+  state.activities = [];
+  state.steps = 0;
+  try {
+    const s = await kvGet(settingsKey());
+    if (s && s.value) {
+      const parsed = JSON.parse(s.value);
+      state.limit = parsed.dailyLimit || 2000;
+      state.weight = parsed.weightKg || 70;
+    }
+  } catch(e) {}
+  try {
+    const l = await kvGet(todayKey());
+    if (l && l.value) state.entries = JSON.parse(l.value);
+  } catch(e) {}
+  try {
+    const a = await kvGet(activityKey());
+    if (a && a.value) {
+      const parsed = JSON.parse(a.value);
+      state.activities = parsed.activities || [];
+      state.steps = parsed.steps || 0;
+    }
+  } catch(e) {}
+  state.limitDraft = state.limit;
+  state.weightDraft = state.weight;
+  state.stepsDraft = state.steps;
+  state.page = 'today';
+  render();
+}
+
+async function saveEntries() {
+  try { await kvSet(todayKey(), JSON.stringify(state.entries)); }
+  catch(e) { console.error('save entries failed', e); }
+}
+
+async function saveActivity() {
+  try { await kvSet(activityKey(), JSON.stringify({ activities: state.activities, steps: state.steps })); }
+  catch(e) { console.error('save activity failed', e); }
+}
+
+async function saveSettings() {
+  try { await kvSet(settingsKey(), JSON.stringify({ dailyLimit: state.limit, weightKg: state.weight })); }
+  catch(e) { console.error('save settings failed', e); }
+}
+
+function caloriesFromSteps(steps, weightKg) {
+  return Math.round(steps * 0.00057 * weightKg);
+}
+
+function icon(name) {
+  const icons = {
+    settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+    camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+    flame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2s-5 5.5-5 10a5 5 0 0 0 10 0c0-1.5-.6-2.4-1.2-3.3.1 1.5-.6 2.3-1.3 2.3-.8 0-1-.7-.9-1.5.2-1.6-.5-3.2-1.6-4.5-.3 1.4-1 2.4-2 3-.7.4-1 1.4-1 2.5"/></svg>',
+    footprints: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 15c1.5 0 2.5-1.2 2.5-3S9 4 7 4 4.5 6 4.5 8 5 12 5 13c0 1.3.9 2 2 2z"/><path d="M16 21c1.5 0 2.5-1.2 2.5-3s-1.5-8-3.5-8-2.5 2-2.5 4S13 18 13 19c0 1.3.9 2 2 2z"/></svg>',
+    chevronLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>',
+    chevronRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>',
+    users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
+  };
+  return icons[name] || '';
+}
+
+function render() {
+  if (state.booting) {
+    document.getElementById('app').innerHTML = '';
+    return;
+  }
+  if (!state.profile) {
+    document.getElementById('app').innerHTML = renderProfilePicker();
+    return;
+  }
+
+  const consumed = state.entries.reduce((sum, e) => sum + e.calories, 0);
+  const stepCals = caloriesFromSteps(state.steps, state.weight);
+  const burned = stepCals + state.activities.reduce((sum, a) => sum + a.calories, 0);
+  const effectiveBudget = state.limit + burned;
+  const remaining = effectiveBudget - consumed;
+  const pct = Math.max(0, Math.min(1, consumed / effectiveBudget));
+  const circumference = 2 * Math.PI * 70;
+  const dashOffset = circumference * (1 - pct);
+  const ringColor = remaining < 0 ? '#D8756A' : '#D8A857';
+
+  let html = '';
+  html += '<div class="header">';
+  html += '<div><div class="title">Portion</div><div class="date">' + fmtDate() + ' \u00b7 ' + escapeHtml(currentProfileName()) + '</div></div>';
+  html += '<div style="display:flex;gap:2px;">';
+  html += '<button class="icon-btn" onclick="switchProfile()" title="Switch profile">' + icon('users') + '</button>';
+  html += '<button class="icon-btn" onclick="openSettings()">' + icon('settings') + '</button>';
+  html += '</div>';
+  html += '</div>';
+
+  html += '<div class="page-nav">';
+  html += '<button class="tab-btn' + (state.page === 'today' ? ' active' : '') + '" onclick="switchPage(\'today\')">Today</button>';
+  html += '<button class="tab-btn' + (state.page === 'calendar' ? ' active' : '') + '" onclick="switchPage(\'calendar\')">Calendar</button>';
+  html += '</div>';
+
+  if (state.page === 'calendar') {
+    html += renderCalendarPage();
+  } else {
+
+  html += '<div class="gauge-wrap">';
+  html += '<svg width="170" height="170" viewBox="0 0 170 170">';
+  html += '<circle cx="85" cy="85" r="70" fill="none" stroke="#26251F" stroke-width="12"/>';
+  html += '<circle cx="85" cy="85" r="70" fill="none" stroke="' + ringColor + '" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + circumference + '" stroke-dashoffset="' + dashOffset + '" transform="rotate(-90 85 85)" style="transition: stroke-dashoffset 0.4s ease"/>';
+  html += '</svg>';
+  html += '<div class="gauge-center" style="margin-top:-118px">';
+  html += '<div class="gauge-remaining" style="text-align:center">' + Math.abs(remaining).toLocaleString() + '</div>';
+  html += '<div class="gauge-label" style="text-align:center">' + (remaining < 0 ? 'over budget' : 'kcal left') + '</div>';
+  html += '</div>';
+  html += '<div class="gauge-sub">';
+  html += '<span><span class="stat-label">eaten</span><span class="stat-val">' + consumed.toLocaleString() + '</span></span>';
+  html += '<span><span class="stat-label">budget</span><span class="stat-val">' + state.limit.toLocaleString() + '</span></span>';
+  if (burned > 0) {
+    html += '<span><span class="stat-label">burned</span><span class="stat-val" style="color:#7FB88A">+' + burned.toLocaleString() + '</span></span>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  html += '<div class="section-label">Today\'s log</div>';
+  if (state.entries.length === 0) {
+    html += '<div class="empty">Nothing logged yet.<br>Tap the camera button to snap your first plate \u2014 adobo, sinigang, pancit, whatever\'s on the table.</div>';
+  } else {
+    const mealOrder = ['breakfast', 'lunch', 'dinner', 'snack'];
+    const mealLabels = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snacks' };
+    mealOrder.forEach(meal => {
+      const group = state.entries.filter(e => (e.mealType || 'snack') === meal);
+      if (group.length === 0) return;
+      const groupTotal = group.reduce((s, e) => s + e.calories, 0);
+      html += '<div class="meal-group-label"><span>' + mealLabels[meal] + '</span><span>' + groupTotal.toLocaleString() + ' kcal</span></div>';
+      html += '<div class="log">';
+      group.slice().reverse().forEach(e => {
+        html += '<div class="entry">';
+        html += '<img src="' + e.thumb + '">';
+        html += '<div class="entry-info"><div class="entry-name">' + escapeHtml(e.name) + '</div><div class="entry-portion">' + escapeHtml(e.portion) + '</div></div>';
+        html += '<div class="entry-cals">' + e.calories + '</div>';
+        html += '<button class="entry-del" onclick="deleteEntry(\'' + e.id + '\')">' + icon('trash') + '</button>';
+        html += '</div>';
+      });
+      html += '</div>';
+    });
+  }
+
+  if (state.steps > 0 || state.activities.length > 0) {
+    html += '<div class="section-label">Activity</div>';
+    html += '<div class="log">';
+    if (state.steps > 0) {
+      html += '<div class="entry">';
+      html += '<div class="activity-icon">' + icon('footprints') + '</div>';
+      html += '<div class="entry-info"><div class="entry-name">' + state.steps.toLocaleString() + ' steps</div><div class="entry-portion">walking, estimated</div></div>';
+      html += '<div class="entry-cals burn">+' + stepCals + '</div>';
+      html += '<button class="entry-del" onclick="clearSteps()">' + icon('trash') + '</button>';
+      html += '</div>';
+    }
+    state.activities.slice().reverse().forEach(a => {
+      html += '<div class="entry">';
+      html += '<div class="activity-icon">' + icon('flame') + '</div>';
+      html += '<div class="entry-info"><div class="entry-name">' + escapeHtml(a.name) + '</div><div class="entry-portion">' + escapeHtml(a.detail) + '</div></div>';
+      html += '<div class="entry-cals burn">+' + a.calories + '</div>';
+      html += '<button class="entry-del" onclick="deleteActivity(\'' + a.id + '\')">' + icon('trash') + '</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  html += '<div class="fab-row">';
+  html += '<button class="fab fab-secondary" onclick="openActivity()">' + icon('flame') + '</button>';
+  html += '<button class="fab" onclick="triggerCamera()">' + icon('camera') + '</button>';
+  html += '</div>';
+
+  }
+
+  if (state.view === 'settings') {
+    html += renderSettingsSheet();
+  } else if (state.view === 'analyzing') {
+    html += renderAnalyzingSheet();
+  } else if (state.view === 'result') {
+    html += renderResultSheet();
+  } else if (state.view === 'activity') {
+    html += renderActivitySheet();
+  }
+
+  document.getElementById('app').innerHTML = html;
+}
+
+function renderCalendarPage() {
+  let h = '';
+  const month = state.calendarMonth;
+  const year = month.getFullYear();
+  const mo = month.getMonth();
+  const monthLabel = month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const startWeekday = new Date(year, mo, 1).getDay();
+  const daysInMonth = new Date(year, mo + 1, 0).getDate();
+  const todayStr = todayDateStr();
+
+  h += '<div class="cal-header">';
+  h += '<button class="cal-nav-btn" onclick="prevMonth()">' + icon('chevronLeft') + '</button>';
+  h += '<div class="cal-month">' + monthLabel + '</div>';
+  h += '<button class="cal-nav-btn" onclick="nextMonth()">' + icon('chevronRight') + '</button>';
+  h += '</div>';
+
+  if (state.calendarLoading) {
+    h += '<div class="loading-wrap"><div class="spinner"></div><div>Loading month\u2026</div></div>';
+    return h;
+  }
+
+  h += '<div class="cal-grid">';
+  ['S','M','T','W','T','F','S'].forEach(d => { h += '<div class="cal-dow">' + d + '</div>'; });
+  for (let i = 0; i < startWeekday; i++) h += '<div class="cal-day empty"></div>';
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = year + '-' + String(mo + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    const d = state.calendarData[dateStr];
+    let cls = 'cal-day';
+    let calText = '\u2013';
+    if (dateStr === todayStr) cls += ' today-cell';
+    if (d) {
+      const net = d.consumed - d.burned;
+      calText = net.toLocaleString();
+      cls += (net > state.limit ? ' over' : ' under');
+    }
+    h += '<div class="' + cls + '"><div class="d-num">' + day + '</div><div class="d-cal">' + calText + '</div></div>';
+  }
+  h += '</div>';
+
+  h += '<div class="cal-legend">';
+  h += '<span><span class="cal-dot" style="background:#7FB88A"></span>within budget</span>';
+  h += '<span><span class="cal-dot" style="background:#D8756A"></span>over budget</span>';
+  h += '</div>';
+
+  return h;
+}
+
+async function switchPage(page) {
+  state.page = page;
+  if (page === 'calendar') {
+    await loadCalendarMonth();
+  } else {
+    render();
+  }
+}
+
+async function loadCalendarMonth() {
+  state.calendarLoading = true;
+  render();
+  const prefix = monthPrefix(state.calendarMonth);
+  const data = {};
+  try {
+    const logList = await kvList('log:' + state.profile + ':' + prefix);
+    const actList = await kvList('activity:' + state.profile + ':' + prefix);
+    const logKeys = (logList && logList.keys) || [];
+    const actKeys = (actList && actList.keys) || [];
+    await Promise.all(logKeys.map(async key => {
+      try {
+        const r = await kvGet(key);
+        if (r && r.value) {
+          const entries = JSON.parse(r.value);
+          const dateStr = key.split(':')[2];
+          data[dateStr] = data[dateStr] || { consumed: 0, burned: 0 };
+          data[dateStr].consumed = entries.reduce((s, e) => s + e.calories, 0);
+        }
+      } catch(e) {}
+    }));
+    await Promise.all(actKeys.map(async key => {
+      try {
+        const r = await kvGet(key);
+        if (r && r.value) {
+          const parsed = JSON.parse(r.value);
+          const dateStr = key.split(':')[2];
+          data[dateStr] = data[dateStr] || { consumed: 0, burned: 0 };
+          const stepCals = caloriesFromSteps(parsed.steps || 0, state.weight);
+          const actCals = (parsed.activities || []).reduce((s, a) => s + a.calories, 0);
+          data[dateStr].burned = stepCals + actCals;
+        }
+      } catch(e) {}
+    }));
+  } catch(e) { console.error('calendar load failed', e); }
+  state.calendarData = data;
+  state.calendarLoading = false;
+  render();
+}
+
+function prevMonth() {
+  state.calendarMonth = new Date(state.calendarMonth.getFullYear(), state.calendarMonth.getMonth() - 1, 1);
+  loadCalendarMonth();
+}
+
+function nextMonth() {
+  state.calendarMonth = new Date(state.calendarMonth.getFullYear(), state.calendarMonth.getMonth() + 1, 1);
+  loadCalendarMonth();
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function renderProfilePicker() {
+  let h = '<div class="profile-page">';
+  h += '<div class="profile-title">Portion</div>';
+  h += '<div class="profile-sub">Who\'s tracking?</div>';
+  if (state.profilesList.length > 0) {
+    h += '<div class="profile-list">';
+    state.profilesList.forEach(p => {
+      h += '<button class="profile-btn" onclick="selectProfile(\'' + p.slug + '\')">' + escapeHtml(p.name) + '</button>';
+    });
+    h += '</div>';
+  }
+  if (state.profileError) {
+    h += '<div class="err">' + escapeHtml(state.profileError) + '</div>';
+  }
+  h += '<label>Add your name</label>';
+  h += '<input type="text" id="newProfileInput" placeholder="e.g. Marielle">';
+  h += '<div class="sheet-row" style="margin-top:16px;"><button class="btn btn-primary" onclick="createProfile()">Continue</button></div>';
+  h += '<div class="hint" style="margin-top:24px;">This is a simple name picker for friends sharing the app \u2014 not a secure login. Anyone can select any name from the list, so keep it to people you trust.</div>';
+  h += '</div>';
+  return h;
+}
+
+function renderSettingsSheet() {
+  let h = '<div class="overlay" onclick="closeSheetIfBackdrop(event)">';
+  h += '<div class="sheet">';
+  h += '<div class="sheet-title">Settings</div>';
+  h += '<label>Daily calorie budget (kcal)</label>';
+  h += '<input type="number" id="limitInput" value="' + state.limitDraft + '" inputmode="numeric">';
+  h += '<label>Body weight (kg)</label>';
+  h += '<input type="number" id="weightInput" value="' + state.weightDraft + '" inputmode="numeric">';
+  h += '<div class="hint">Used to estimate calories burned from steps and workouts.</div>';
+  h += '<div class="sheet-row">';
+  h += '<button class="btn btn-secondary" onclick="closeSheet()">Cancel</button>';
+  h += '<button class="btn btn-primary" onclick="confirmSettings()">Save</button>';
+  h += '</div></div></div>';
+  return h;
+}
+
+function renderAnalyzingSheet() {
+  let h = '<div class="overlay">';
+  h += '<div class="sheet">';
+  h += '<div class="loading-wrap"><div class="spinner"></div><div>Reading the plate\u2026</div></div>';
+  h += '</div></div>';
+  return h;
+}
+
+function renderResultSheet() {
+  const r = state.pendingResult;
+  let h = '<div class="overlay" onclick="closeSheetIfBackdrop(event)">';
+  h += '<div class="sheet">';
+  if (state.error) {
+    h += '<div class="err">' + escapeHtml(state.error) + '</div>';
+    h += '<div class="sheet-row"><button class="btn btn-secondary" onclick="closeSheet()">Close</button><button class="btn btn-primary" onclick="retryAnalysis()">Try again</button></div>';
+  } else if (r) {
+    h += '<div class="analyzed-preview">';
+    h += '<img src="' + state.pendingImage + '">';
+    h += '<div><div class="analyzed-portion">' + escapeHtml(r.portion_description) + '</div><div class="analyzed-cals">' + r.estimated_calories + ' kcal</div></div>';
+    h += '</div>';
+    h += '<label>Food name</label>';
+    h += '<input type="text" id="editNameInput" value="' + escapeHtml(r.food_name) + '">';
+    h += '<label>Meal</label>';
+    h += '<select id="mealTypeInput">';
+    [['breakfast','Breakfast'], ['lunch','Lunch'], ['dinner','Dinner'], ['snack','Snack']].forEach(m => {
+      h += '<option value="' + m[0] + '"' + (m[0] === state.pendingMealType ? ' selected' : '') + '>' + m[1] + '</option>';
+    });
+    h += '</select>';
+    h += '<div class="sheet-row">';
+    h += '<button class="btn btn-secondary" onclick="closeSheet()">Discard</button>';
+    h += '<button class="btn btn-primary" onclick="confirmAddEntry()">Add to log</button>';
+    h += '</div>';
+  }
+  h += '</div></div>';
+  return h;
+}
+
+function renderActivitySheet() {
+  let h = '<div class="overlay" onclick="closeSheetIfBackdrop(event)">';
+  h += '<div class="sheet">';
+  h += '<div class="sheet-title">Log activity</div>';
+  h += '<div class="tabs">';
+  h += '<button class="tab-btn' + (state.activityTab === 'steps' ? ' active' : '') + '" onclick="setActivityTab(\'steps\')">Steps</button>';
+  h += '<button class="tab-btn' + (state.activityTab === 'manual' ? ' active' : '') + '" onclick="setActivityTab(\'manual\')">Workout</button>';
+  h += '<button class="tab-btn' + (state.activityTab === 'youtube' ? ' active' : '') + '" onclick="setActivityTab(\'youtube\')">YouTube</button>';
+  h += '</div>';
+
+  if (state.activityLoading) {
+    h += '<div class="loading-wrap"><div class="spinner"></div><div>Looking up the workout\u2026</div></div>';
+    h += '</div></div>';
+    return h;
+  }
+
+  if (state.activityError) {
+    h += '<div class="err">' + escapeHtml(state.activityError) + '</div>';
+  }
+
+  if (state.activityTab === 'steps') {
+    h += '<label>Total steps today</label>';
+    h += '<input type="number" id="stepsInput" value="' + state.stepsDraft + '" inputmode="numeric">';
+    h += '<div class="hint">This replaces today\'s step count \u2014 enter your running total, not just new steps.</div>';
+    h += '<div class="sheet-row">';
+    h += '<button class="btn btn-secondary" onclick="closeSheet()">Cancel</button>';
+    h += '<button class="btn btn-primary" onclick="confirmSteps()">Save</button>';
+    h += '</div>';
+  } else if (state.activityTab === 'manual') {
+    h += '<label>Workout type</label>';
+    h += '<select id="workoutTypeInput">';
+    Object.keys(MET_TABLE).forEach(k => {
+      h += '<option value="' + k + '"' + (k === state.workoutType ? ' selected' : '') + '>' + MET_TABLE[k].label + '</option>';
+    });
+    h += '</select>';
+    h += '<label>Duration (minutes)</label>';
+    h += '<input type="number" id="workoutMinutesInput" value="' + state.workoutMinutes + '" inputmode="numeric">';
+    h += '<div class="sheet-row">';
+    h += '<button class="btn btn-secondary" onclick="closeSheet()">Cancel</button>';
+    h += '<button class="btn btn-primary" onclick="confirmManualWorkout()">Add</button>';
+    h += '</div>';
+  } else if (state.activityTab === 'youtube') {
+    h += '<label>YouTube workout link</label>';
+    h += '<input type="text" id="ytUrlInput" placeholder="https://youtube.com/watch?v=..." value="' + escapeHtml(state.ytUrlDraft) + '">';
+    h += '<label>Minutes actually done (optional)</label>';
+    h += '<input type="number" id="ytMinutesInput" placeholder="leave blank to use full video" value="' + escapeHtml(state.ytMinutesDraft) + '" inputmode="numeric">';
+    h += '<div class="hint">Looks up the video to identify the workout and estimates calories burned using your body weight.</div>';
+    h += '<div class="sheet-row">';
+    h += '<button class="btn btn-secondary" onclick="closeSheet()">Cancel</button>';
+    h += '<button class="btn btn-primary" onclick="analyzeYoutubeWorkout()">Analyze</button>';
+    h += '</div>';
+  }
+
+  h += '</div></div>';
+  return h;
+}
+
+function openActivity() {
+  state.stepsDraft = state.steps;
+  state.activityError = null;
+  state.view = 'activity';
+  render();
+}
+
+function setActivityTab(tab) {
+  state.activityTab = tab;
+  state.activityError = null;
+  render();
+}
+
+function clearSteps() {
+  state.steps = 0;
+  saveActivity();
+  render();
+}
+
+function confirmSteps() {
+  const val = parseInt(document.getElementById('stepsInput').value, 10);
+  state.steps = (val && val > 0) ? val : 0;
+  saveActivity();
+  closeSheet();
+}
+
+function confirmManualWorkout() {
+  const type = document.getElementById('workoutTypeInput').value;
+  const minutes = parseInt(document.getElementById('workoutMinutesInput').value, 10);
+  if (!minutes || minutes <= 0) return;
+  const met = MET_TABLE[type].met;
+  const calories = Math.round(met * state.weight * (minutes / 60));
+  state.activities.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name: MET_TABLE[type].label,
+    detail: minutes + ' min \u00b7 manual entry',
+    calories: calories
+  });
+  state.workoutType = type;
+  state.workoutMinutes = minutes;
+  saveActivity();
+  closeSheet();
+}
+
+function deleteActivity(id) {
+  state.activities = state.activities.filter(a => a.id !== id);
+  saveActivity();
+  render();
+}
+
+async function analyzeYoutubeWorkout() {
+  const url = document.getElementById('ytUrlInput').value.trim();
+  const minutesOverride = document.getElementById('ytMinutesInput').value.trim();
+  if (!url) return;
+  state.ytUrlDraft = url;
+  state.ytMinutesDraft = minutesOverride;
+  state.activityLoading = true;
+  state.activityError = null;
+  render();
+
+  try {
+    const overrideNote = minutesOverride
+      ? "The user says they actually did " + minutesOverride + " minutes of it (use this as the real duration performed, even if the full video is longer or shorter)."
+      : "The user did the full video, so use the video's actual runtime as the duration.";
+
+    const systemPrompt = "You identify workout videos from a YouTube link using web search, then estimate calories burned. Search for the video to determine: the type of workout (e.g. running, HIIT, cycling, dance cardio, yoga, strength training, boxing) and its typical intensity, and the video's runtime in minutes. Pick the closest standard MET (metabolic equivalent) value for the workout's intensity. Calculate estimated calories burned as MET * body_weight_kg * (duration_minutes / 60), rounded to the nearest whole number. Respond with ONLY a raw JSON object as your final output, no markdown fences, no commentary before or after, in exactly this shape: {\"workout_name\": string, \"estimated_duration_minutes\": integer, \"met_value\": number, \"estimated_calories_burned\": integer}. If you cannot find or identify the video, set workout_name to \"Not found\" and estimated_calories_burned to 0.";
+
+    const userText = "YouTube link: " + url + "\nUser's body weight: " + state.weight + " kg\n" + overrideNote;
+
+    const response = await fetch(API_BASE + "/api/claude", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userText }],
+        tools: [{ type: "web_search_20250305", name: "web_search" }]
+      })
+    });
+
+    const data = await response.json();
+    const textBlocks = (data.content || []).filter(b => b.type === 'text');
+    if (textBlocks.length === 0) throw new Error('No response from model');
+    const lastText = textBlocks[textBlocks.length - 1].text;
+    let clean = lastText.trim().replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+    const parsed = JSON.parse(clean);
+
+    if (!parsed.workout_name || typeof parsed.estimated_calories_burned !== 'number') {
+      throw new Error('Could not read the result.');
+    }
+    if (parsed.workout_name === 'Not found' || parsed.estimated_calories_burned === 0) {
+      state.activityError = "Couldn't identify that workout video. Try pasting a different link, or log it manually instead.";
+      state.activityLoading = false;
+      render();
+      return;
+    }
+
+    const durationLabel = minutesOverride ? (minutesOverride + ' min (of a ' + parsed.estimated_duration_minutes + ' min video)') : (parsed.estimated_duration_minutes + ' min video');
+    state.activities.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      name: parsed.workout_name,
+      detail: durationLabel + ' \u00b7 YouTube',
+      calories: parsed.estimated_calories_burned
+    });
+    saveActivity();
+    state.activityLoading = false;
+    state.ytUrlDraft = '';
+    state.ytMinutesDraft = '';
+    closeSheet();
+  } catch (err) {
+    console.error(err);
+    state.activityLoading = false;
+    state.activityError = "Something went wrong looking up that video. Check the link and your connection, then try again.";
+    render();
+  }
+}
+
+function openSettings() {
+  state.limitDraft = state.limit;
+  state.view = 'settings';
+  render();
+  document.getElementById('limitInput').focus();
+}
+
+function closeSheet() {
+  state.view = null;
+  state.error = null;
+  state.pendingResult = null;
+  state.pendingImage = null;
+  state.activityError = null;
+  state.activityLoading = false;
+  render();
+}
+
+function closeSheetIfBackdrop(ev) {
+  if (ev.target.classList.contains('overlay')) closeSheet();
+}
+
+function confirmSettings() {
+  const val = parseInt(document.getElementById('limitInput').value, 10);
+  const w = parseInt(document.getElementById('weightInput').value, 10);
+  if (val && val > 0) state.limit = val;
+  if (w && w > 0) state.weight = w;
+  saveSettings();
+  state.view = null;
+  render();
+}
+
+function deleteEntry(id) {
+  state.entries = state.entries.filter(e => e.id !== id);
+  saveEntries();
+  render();
+}
+
+function triggerCamera() {
+  document.getElementById('fileInput').click();
+}
+
+document.getElementById('fileInput').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  const dataUrl = await fileToDataUrl(file);
+  state.pendingImage = dataUrl;
+  state.view = 'analyzing';
+  state.error = null;
+  render();
+  analyzeImage(dataUrl);
+});
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function retryAnalysis() {
+  state.error = null;
+  state.view = 'analyzing';
+  render();
+  analyzeImage(state.pendingImage);
+}
+
+async function analyzeImage(dataUrl) {
+  try {
+    const commaIdx = dataUrl.indexOf(',');
+    const meta = dataUrl.substring(5, commaIdx).split(';')[0];
+    const base64 = dataUrl.substring(commaIdx + 1);
+
+    const systemPrompt = "You are a nutrition estimator specialized in Filipino and wider Asian cuisine (Filipino, Chinese, Japanese, Korean, Thai, Vietnamese, Indonesian, Malaysian, Indian). Most photos you'll see are home-cooked or carinderia/hawker-style meals from these cuisines, so identify the specific dish by name rather than a generic description whenever you can \u2014 e.g. say 'chicken adobo' not 'braised meat', 'sinigang na baboy' not 'sour soup', 'pancit canton' not 'stir-fried noodles'.\n\nUse any visible container (rice bowl, plate, kanin cup, glass, mug, palayok/clay pot) as a scale reference for real-world portion size, factoring in depth and fill-level, not just top-down area. Keep these regional conventions in mind:\n- A standard Filipino rice cup/scoop of cooked rice is roughly 150-200g (about 190-260 kcal); many meals are served with 1-2 cups of rice on the side even if the rice is on a separate plate from the ulam (viand) \u2014 account for it if visible.\n- Filipino and Southeast Asian home cooking is often oil-, coconut milk-, or sugar-rich (adobo, kare-kare, bicol express, laing, lechon kawali, crispy pata, halo-halo, turon) \u2014 don't lowball calorie density just because a dish looks like 'just vegetables' or 'just soup'; sauces and frying matter a lot.\n- Common high-calorie-density items to calibrate against: lechon/lechon kawali and crispy pata (very high, deep-fried pork), sisig (fatty, oily), kare-kare (peanut sauce, rich), halo-halo and taho (added sugar/syrup), pancit and lumpia (oil-fried or oil-tossed).\n- Lighter/lower-density reference points: sinigang and tinola broths (mostly water-based, lower calorie unless very meat-heavy), fresh lumpia (unfried), steamed fish, most vegetable-forward ulam.\n- For other Asian cuisine, calibrate similarly: ramen and pho broths are moderate, curries and fried rice are dense, sushi/sashimi is lighter per piece but rice adds up, dumplings and fried items are dense.\n- If multiple dishes/components are visible on one plate (e.g. rice + ulam + a side), estimate each component's contribution and sum them into one total, and mention the components in the portion description.\n\nRespond with ONLY a raw JSON object, no markdown fences, no commentary, in exactly this shape: {\"food_name\": string (use the specific local/regional dish name when recognizable), \"portion_description\": string describing the estimated size/volume, container, and any components summed together, \"estimated_calories\": integer, \"confidence\": \"high\" | \"medium\" | \"low\"}. If the image does not clearly show food or drink, set food_name to \"Not recognized\" and estimated_calories to 0.";
+
+    const response = await fetch(API_BASE + "/api/claude", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: meta, data: base64 } },
+              { type: "text", text: "Analyze this plate/glass and estimate the calories." }
+            ]
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    const textBlock = (data.content || []).find(b => b.type === 'text');
+    if (!textBlock) throw new Error('No response from model');
+    let clean = textBlock.text.trim().replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+    const parsed = JSON.parse(clean);
+
+    if (!parsed.food_name || typeof parsed.estimated_calories !== 'number') {
+      throw new Error('Could not read the result. Try a clearer photo.');
+    }
+    if (parsed.food_name === 'Not recognized' || parsed.estimated_calories === 0) {
+      state.error = "Couldn't recognize food or drink in that photo. Try again with the dish clearly in frame.";
+      state.view = 'result';
+      render();
+      return;
+    }
+
+    state.pendingResult = parsed;
+    state.pendingMealType = defaultMealType();
+    state.view = 'result';
+    render();
+  } catch (err) {
+    console.error(err);
+    state.error = "Something went wrong analyzing that photo. Check your connection and try again.";
+    state.view = 'result';
+    render();
+  }
+}
+
+function confirmAddEntry() {
+  const r = state.pendingResult;
+  const nameInput = document.getElementById('editNameInput');
+  const mealInput = document.getElementById('mealTypeInput');
+  const finalName = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : r.food_name;
+  const mealType = mealInput ? mealInput.value : defaultMealType();
+  state.entries.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name: finalName,
+    portion: r.portion_description,
+    calories: r.estimated_calories,
+    mealType: mealType,
+    thumb: state.pendingImage,
+    time: Date.now()
+  });
+  saveEntries();
+  closeSheet();
+}
+
+window.openSettings = openSettings;
+window.closeSheet = closeSheet;
+window.closeSheetIfBackdrop = closeSheetIfBackdrop;
+window.confirmSettings = confirmSettings;
+window.deleteEntry = deleteEntry;
+window.triggerCamera = triggerCamera;
+window.retryAnalysis = retryAnalysis;
+window.confirmAddEntry = confirmAddEntry;
+window.openActivity = openActivity;
+window.setActivityTab = setActivityTab;
+window.clearSteps = clearSteps;
+window.confirmSteps = confirmSteps;
+window.confirmManualWorkout = confirmManualWorkout;
+window.deleteActivity = deleteActivity;
+window.analyzeYoutubeWorkout = analyzeYoutubeWorkout;
+window.switchPage = switchPage;
+window.prevMonth = prevMonth;
+window.nextMonth = nextMonth;
+window.selectProfile = selectProfile;
+window.createProfile = createProfile;
+window.switchProfile = switchProfile;
+
+boot();
+</script>
+</body>
+</html>
