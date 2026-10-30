@@ -331,6 +331,7 @@
     border-radius: 8px;
     background: #D64E27;
     border: 1px solid #131311;
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -370,6 +371,8 @@
     color: #131311;
   }
   .cal-legend span { display: flex; align-items: center; gap: 6px; }
+  .cal-flag { position: absolute; top: 1px; right: 2px; width: 16px; height: 16px; display: block; }
+  .cal-legend .cal-flag { position: static; width: 14px; height: 14px; }
   .cal-dot { width: 8px; height: 8px; border-radius: 50%; }
   .overlay {
     position: fixed;
@@ -457,6 +460,16 @@
   .n-val small { font-size: 10px; font-weight: 400; margin-left: 1px; }
   .n-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; opacity: 0.8; }
   .entry-nutrients { font-size: 11px; color: #131311; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; opacity: 0.8; }
+  .tally { margin: 8px 20px 4px; display: flex; flex-direction: column; gap: 9px; color: #131311; }
+  .sheet .tally { margin: 10px 0 8px; color: #FFFFFF; }
+  .tally-row-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; margin-bottom: 4px; }
+  .tally-name { font-family: 'PP Mori Black', -apple-system, sans-serif; font-weight: 900; font-size: 12px; }
+  .tally-amt { opacity: 0.85; }
+  .tally-amt b { font-weight: 700; }
+  .tally-track { height: 10px; border-radius: 6px; background: #963717; overflow: hidden; }
+  .sheet .tally-track { background: #3A392F; }
+  .tally-fill { height: 100%; border-radius: 6px; background: #D8A857; }
+  .tally-fill.done { background: #4CAF6B; }
   .nutrient-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .analyzed-cals {
     font-family: 'JetBrains Mono', monospace;
@@ -771,6 +784,7 @@ function fmtDate() {
 async function loadState() {
   state.limit = 2000;
   state.weight = 70;
+  state.goals = {};
   state.entries = [];
   state.activities = [];
   state.steps = 0;
@@ -782,6 +796,7 @@ async function loadState() {
       const parsed = JSON.parse(s.value);
       state.limit = parsed.dailyLimit || 2000;
       state.weight = parsed.weightKg || 70;
+      state.goals = parsed.goals || {};
     }
   } catch(e) {}
   try {
@@ -816,7 +831,7 @@ async function saveActivity() {
 }
 
 async function saveSettings() {
-  try { await kvSet(settingsKey(), JSON.stringify({ dailyLimit: state.limit, weightKg: state.weight })); }
+  try { await kvSet(settingsKey(), JSON.stringify({ dailyLimit: state.limit, weightKg: state.weight, goals: state.goals || {} })); }
   catch(e) { console.error('save settings failed', e); }
 }
 
@@ -897,8 +912,8 @@ function render() {
   html += '</div>';
 
   if (state.entries.some(hasNutrients)) {
-    html += '<div class="section-label" style="margin-top:22px;">Nutrients today</div>';
-    html += nutrientGridHtml(sumNutrients(state.entries));
+    html += '<div class="section-label" style="margin-top:22px;">Daily tally</div>';
+    html += tallyHtml(state.entries);
   }
   html += '<div class="section-label">Today\'s log</div>';
   if (state.entries.length === 0) {
@@ -1035,7 +1050,7 @@ function renderCalendarPage() {
     let cls = 'cal-day';
     let calText = '\u2013';
     if (dateStr === todayStr) cls += ' today-cell';
-    if (d) {
+    if (d && (d.consumed > 0 || d.burned > 0)) {
       const net = d.consumed - d.burned;
       const remaining = state.limit - net;
       if (remaining >= 0) {
@@ -1046,13 +1061,14 @@ function renderCalendarPage() {
         cls += ' over';
       }
     }
-    h += '<div class="' + cls + '" onclick="openDayDetail(\'' + dateStr + '\')"><div class="d-num">' + day + '</div><div class="d-cal">' + calText + '</div></div>';
+    h += '<div class="' + cls + '" onclick="openDayDetail(\'' + dateStr + '\')"><div class="d-num">' + day + '</div><div class="d-cal">' + calText + '</div>' + (d && d.poop > 0 ? BROWN_FLAG_SVG : '') + '</div>';
   }
   h += '</div>';
 
   h += '<div class="cal-legend">';
   h += '<span><span class="cal-dot" style="background:#7FB88A"></span>kcal left</span>';
   h += '<span><span class="cal-dot" style="background:#D9342B"></span>kcal over</span>';
+  h += '<span>' + BROWN_FLAG_SVG + 'pooped</span>';
   h += '</div>';
 
   return h;
@@ -1095,6 +1111,7 @@ async function loadCalendarMonth() {
           const parsed = JSON.parse(r.value);
           const dateStr = key.split(':')[2];
           data[dateStr] = data[dateStr] || { consumed: 0, burned: 0 };
+          data[dateStr].poop = parsed.poop || 0;
           const stepCals = caloriesFromSteps(parsed.steps || 0, state.weight);
           const actCals = (parsed.activities || []).reduce((s, a) => s + a.calories, 0);
           data[dateStr].burned = stepCals + actCals;
@@ -1145,6 +1162,8 @@ async function openDayDetail(dateStr) {
   render();
 }
 
+const BROWN_FLAG_SVG = '<svg class="cal-flag" viewBox="0 0 12 12" aria-label="pooped"><path d="M2.5 1v10" stroke="#131311" stroke-width="1.2" stroke-linecap="round" fill="none"/><path d="M3 1.6h7l-2 2.4 2 2.4H3z" fill="#9A5320" stroke="#3B1D08" stroke-width="0.7" stroke-linejoin="round"/></svg>';
+
 function renderDayDetailSheet() {
   let h = '<div class="overlay" onclick="closeSheetIfBackdrop(event)">';
   h += '<div class="sheet">';
@@ -1166,7 +1185,7 @@ function renderDayDetailSheet() {
   h += '<div class="hint" style="margin-bottom:14px;">Eaten ' + consumed.toLocaleString() + ' kcal' + (burned > 0 ? ' \u2014 burned ' + burned.toLocaleString() + ' kcal' : '') + ' \u2014 net ' + net.toLocaleString() + ' kcal</div>';
 
   if (state.dayEntries.some(hasNutrients)) {
-    h += nutrientGridHtml(sumNutrients(state.dayEntries));
+    h += tallyHtml(state.dayEntries);
   }
 
   if (state.dayEntries.length === 0 && state.dayActivities.length === 0 && state.daySteps === 0 && state.dayWater === 0 && state.dayPoop === 0) {
@@ -1247,7 +1266,7 @@ function updateCalendarDataForSelectedDate() {
   const stepCals = caloriesFromSteps(state.daySteps, state.weight);
   const burned = stepCals + state.dayActivities.reduce((s, a) => s + a.calories, 0);
   const consumed = state.dayEntries.reduce((s, e) => s + e.calories, 0);
-  state.calendarData[state.selectedDate] = { consumed, burned };
+  state.calendarData[state.selectedDate] = { consumed, burned, poop: state.dayPoop || 0 };
 }
 
 function syncTodayStateIfSelectedIsToday() {
@@ -1324,6 +1343,26 @@ function nutrientGridHtml(vals, id) {
   });
   return h + '</div>';
 }
+function nutrientGoals() {
+  const g = state.goals || {};
+  return {
+    protein: g.protein > 0 ? g.protein : Math.round(state.weight * 1.2),
+    carbs: g.carbs > 0 ? g.carbs : Math.round(state.limit * 0.5 / 4),
+    calcium: g.calcium > 0 ? g.calcium : 1000,
+    vitaminD: g.vitaminD > 0 ? g.vitaminD : 15
+  };
+}
+function tallyHtml(entries) {
+  const tot = sumNutrients(entries);
+  const goals = nutrientGoals();
+  let h = '<div class="tally">';
+  NUTRIENTS.forEach(n => {
+    const pct = goals[n.key] > 0 ? Math.round(tot[n.key] / goals[n.key] * 100) : 0;
+    h += '<div><div class="tally-row-top"><span class="tally-name">' + n.label + '</span><span class="tally-amt"><b>' + fmtNut(tot[n.key], n.dec) + '</b> / ' + fmtNut(goals[n.key], n.dec) + ' ' + n.unit + ' \u00b7 ' + pct + '%</span></div>';
+    h += '<div class="tally-track"><div class="tally-fill' + (pct >= 100 ? ' done' : '') + '" style="width:' + Math.min(100, pct) + '%"></div></div></div>';
+  });
+  return h + '</div>';
+}
 function nutrientLine(e) {
   if (!hasNutrients(e)) return '';
   return '<div class="entry-nutrients">' + NUTRIENTS.map(n => n.short + ' ' + fmtNut(nutNum(e[n.key]), n.dec) + n.unit).join(' \u00b7 ') + '</div>';
@@ -1357,6 +1396,15 @@ function renderSettingsSheet() {
   h += '<label>Body weight (kg)</label>';
   h += '<input type="number" id="weightInput" value="' + state.weightDraft + '" inputmode="numeric">';
   h += '<div class="hint">Used to estimate calories burned from steps and workouts.</div>';
+  h += '<label>Daily nutrient goals</label>';
+  h += '<div class="hint" style="margin-top:0;">Leave blank to use the default shown.</div>';
+  const auto = (function(){ const g = state.goals; state.goals = {}; const a = nutrientGoals(); state.goals = g; return a; })();
+  h += '<div class="nutrient-edit">';
+  NUTRIENTS.forEach(n => {
+    const cur = (state.goals && state.goals[n.key] > 0) ? state.goals[n.key] : '';
+    h += '<div><label style="margin-top:0;">' + n.label + ' (' + n.unit + ')</label><input type="number" id="goal_' + n.key + '" min="0" inputmode="decimal" placeholder="' + auto[n.key] + '" value="' + cur + '"></div>';
+  });
+  h += '</div>';
   h += '<div class="sheet-row">';
   h += '<button class="btn btn-secondary" onclick="closeSheet()">Cancel</button>';
   h += '<button class="btn btn-primary" onclick="confirmSettings()">Save</button>';
@@ -1932,6 +1980,7 @@ function saveEditedPoop() {
   if (state.editingStepsSource === 'day') {
     state.dayPoop = poop;
     saveDayActivity();
+    updateCalendarDataForSelectedDate();
     syncTodayStateIfSelectedIsToday();
   } else {
     state.poop = poop;
@@ -1958,6 +2007,7 @@ function confirmAddWorkout() {
 
 function openSettings() {
   state.limitDraft = state.limit;
+  state.weightDraft = state.weight;
   state.view = 'settings';
   render();
   document.getElementById('limitInput').focus();
@@ -1989,6 +2039,13 @@ function confirmSettings() {
   const w = parseInt(document.getElementById('weightInput').value, 10);
   if (val && val > 0) state.limit = val;
   if (w && w > 0) state.weight = w;
+  const goals = {};
+  NUTRIENTS.forEach(n => {
+    const el = document.getElementById('goal_' + n.key);
+    const v = el ? parseFloat(el.value) : NaN;
+    if (v > 0) goals[n.key] = v;
+  });
+  state.goals = goals;
   saveSettings();
   state.view = null;
   render();
