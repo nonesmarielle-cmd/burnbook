@@ -194,7 +194,7 @@
     transform: translateX(-50%);
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 10px;
     max-width: 480px;
   }
   .fab {
@@ -449,6 +449,15 @@
   }
   .analyzed-name { font-size: 15px; font-weight: 600; }
   .analyzed-portion { font-size: 12px; color: #8C897C; margin-top: 3px; }
+  .nutrient-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 6px; margin: 8px 20px 4px; }
+  .sheet .nutrient-grid { margin: 10px 0 6px; }
+  .n-cell { border: 1px solid #131311; border-radius: 10px; padding: 7px 4px; text-align: center; color: #131311; min-width: 0; }
+  .sheet .n-cell { border-color: #3A392F; color: #FFFFFF; }
+  .n-val { font-family: 'PP Mori Black', -apple-system, sans-serif; font-weight: 900; font-size: 15px; white-space: nowrap; }
+  .n-val small { font-size: 10px; font-weight: 400; margin-left: 1px; }
+  .n-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; opacity: 0.8; }
+  .entry-nutrients { font-size: 11px; color: #131311; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; opacity: 0.8; }
+  .nutrient-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .analyzed-cals {
     font-family: 'JetBrains Mono', monospace;
     font-size: 26px;
@@ -594,6 +603,8 @@ const state = {
   entries: [],
   activities: [],
   steps: 0,
+  water: 0,
+  poop: 0,
   view: null,
   pendingImage: null,
   pendingResult: null,
@@ -624,6 +635,8 @@ const state = {
   dayEntries: [],
   dayActivities: [],
   daySteps: 0,
+  dayWater: 0,
+  dayPoop: 0,
   dayLoading: false,
   pendingWorkout: null,
   editingEntry: null,
@@ -761,6 +774,8 @@ async function loadState() {
   state.entries = [];
   state.activities = [];
   state.steps = 0;
+  state.water = 0;
+  state.poop = 0;
   try {
     const s = await kvGet(settingsKey());
     if (s && s.value) {
@@ -779,6 +794,8 @@ async function loadState() {
       const parsed = JSON.parse(a.value);
       state.activities = parsed.activities || [];
       state.steps = parsed.steps || 0;
+      state.water = parsed.water || 0;
+      state.poop = parsed.poop || 0;
     }
   } catch(e) {}
   state.limitDraft = state.limit;
@@ -794,7 +811,7 @@ async function saveEntries() {
 }
 
 async function saveActivity() {
-  try { await kvSet(activityKey(), JSON.stringify({ activities: state.activities, steps: state.steps })); }
+  try { await kvSet(activityKey(), JSON.stringify({ activities: state.activities, steps: state.steps, water: state.water, poop: state.poop })); }
   catch(e) { console.error('save activity failed', e); }
 }
 
@@ -879,6 +896,10 @@ function render() {
   html += '</div>';
   html += '</div>';
 
+  if (state.entries.some(hasNutrients)) {
+    html += '<div class="section-label" style="margin-top:22px;">Nutrients today</div>';
+    html += nutrientGridHtml(sumNutrients(state.entries));
+  }
   html += '<div class="section-label">Today\'s log</div>';
   if (state.entries.length === 0) {
     html += '<div class="empty" style="color:#131311;">Logging your meals? What, like it\'s hard?</div>';
@@ -894,7 +915,7 @@ function render() {
       group.slice().reverse().forEach(e => {
         html += '<div class="entry">';
         html += e.thumb ? ('<img src="' + e.thumb + '">') : ('<img src="' + RICE_EMOJI_URI + '" alt="described meal" style="width:48px;height:48px;border-radius:8px;object-fit:cover;">');
-        html += '<div class="entry-info" onclick="openEditEntry(\'' + e.id + '\', \'today\')" style="cursor:pointer;"><div class="entry-name">' + escapeHtml(e.name) + '</div><div class="entry-portion">' + escapeHtml(e.portion) + '</div></div>';
+        html += '<div class="entry-info" onclick="openEditEntry(\'' + e.id + '\', \'today\')" style="cursor:pointer;"><div class="entry-name">' + escapeHtml(e.name) + '</div><div class="entry-portion">' + escapeHtml(e.portion) + '</div>' + nutrientLine(e) + '</div>';
         html += '<div class="entry-cals">' + e.calories + '</div>';
         html += '<button class="entry-del" onclick="deleteEntry(\'' + e.id + '\')">' + icon('trash') + '</button>';
         html += '</div>';
@@ -925,7 +946,29 @@ function render() {
     html += '</div>';
   }
 
+  if (state.water > 0 || state.poop > 0) {
+    html += '<div class="section-label">Wellness</div>';
+    html += '<div class="log">';
+    if (state.water > 0) {
+      html += '<div class="entry">';
+      html += '<div class="activity-icon" style="font-size:20px;">\uD83D\uDCA7</div>';
+      html += '<div class="entry-info" onclick="openWaterEdit(\'today\')" style="cursor:pointer;"><div class="entry-name">' + state.water + ' glass' + (state.water === 1 ? '' : 'es') + ' of water</div><div class="entry-portion">today\'s total</div></div>';
+      html += '<button class="entry-del" onclick="clearWater()">' + icon('trash') + '</button>';
+      html += '</div>';
+    }
+    if (state.poop > 0) {
+      html += '<div class="entry">';
+      html += '<div class="activity-icon" style="font-size:20px;">\uD83D\uDCA9</div>';
+      html += '<div class="entry-info" onclick="openPoopEdit(\'today\')" style="cursor:pointer;"><div class="entry-name">' + state.poop + ' time' + (state.poop === 1 ? '' : 's') + '</div><div class="entry-portion">today\'s total</div></div>';
+      html += '<button class="entry-del" onclick="clearPoop()">' + icon('trash') + '</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
   html += '<div class="fab-row">';
+  html += '<button class="fab fab-secondary" onclick="openWaterEdit()" style="font-size:26px;line-height:1;">\uD83D\uDCA7</button>';
+  html += '<button class="fab fab-secondary" onclick="openPoopEdit()" style="font-size:26px;line-height:1;">\uD83D\uDCA9</button>';
   html += '<button class="fab fab-secondary" onclick="openActivity()"><img src="' + FIRE_EMOJI_URI + '" alt="fire" style="width:31.2px;height:31.2px;object-fit:contain;"></button>';
   html += '<button class="fab fab-secondary" onclick="openDescribe()"><img src="' + RICE_EMOJI_URI + '" alt="describe meal" style="width:31.2px;height:31.2px;object-fit:contain;"></button>';
   html += '<button class="fab" onclick="triggerCamera()"><img src="' + CAMERA_EMOJI_URI + '" alt="camera" style="width:37px;height:37px;object-fit:contain;"></button>';
@@ -953,6 +996,10 @@ function render() {
     html += renderEditActivitySheet();
   } else if (state.view === 'editSteps') {
     html += renderEditStepsSheet();
+  } else if (state.view === 'editWater') {
+    html += renderEditWaterSheet();
+  } else if (state.view === 'editPoop') {
+    html += renderEditPoopSheet();
   }
 
   document.getElementById('app').innerHTML = html;
@@ -1085,11 +1132,15 @@ async function openDayDetail(dateStr) {
       const parsed = JSON.parse(a.value);
       state.dayActivities = parsed.activities || [];
       state.daySteps = parsed.steps || 0;
+      state.dayWater = parsed.water || 0;
+      state.dayPoop = parsed.poop || 0;
     } else {
       state.dayActivities = [];
       state.daySteps = 0;
+      state.dayWater = 0;
+      state.dayPoop = 0;
     }
-  } catch(e) { state.dayActivities = []; state.daySteps = 0; }
+  } catch(e) { state.dayActivities = []; state.daySteps = 0; state.dayWater = 0; state.dayPoop = 0; }
   state.dayLoading = false;
   render();
 }
@@ -1114,7 +1165,11 @@ function renderDayDetailSheet() {
 
   h += '<div class="hint" style="margin-bottom:14px;">Eaten ' + consumed.toLocaleString() + ' kcal' + (burned > 0 ? ' \u2014 burned ' + burned.toLocaleString() + ' kcal' : '') + ' \u2014 net ' + net.toLocaleString() + ' kcal</div>';
 
-  if (state.dayEntries.length === 0 && state.dayActivities.length === 0 && state.daySteps === 0) {
+  if (state.dayEntries.some(hasNutrients)) {
+    h += nutrientGridHtml(sumNutrients(state.dayEntries));
+  }
+
+  if (state.dayEntries.length === 0 && state.dayActivities.length === 0 && state.daySteps === 0 && state.dayWater === 0 && state.dayPoop === 0) {
     h += '<div class="empty" style="padding:20px 0;">Nothing logged this day.</div>';
   } else {
     if (state.dayEntries.length > 0) {
@@ -1123,7 +1178,7 @@ function renderDayDetailSheet() {
       state.dayEntries.forEach(e => {
         h += '<div class="entry">';
         h += e.thumb ? ('<img src="' + e.thumb + '">') : ('<img src="' + RICE_EMOJI_URI + '" alt="described meal" style="width:48px;height:48px;border-radius:8px;object-fit:cover;">');
-        h += '<div class="entry-info" onclick="openEditEntry(\'' + e.id + '\', \'day\')" style="cursor:pointer;"><div class="entry-name">' + escapeHtml(e.name) + '</div><div class="entry-portion">' + escapeHtml(e.portion) + '</div></div>';
+        h += '<div class="entry-info" onclick="openEditEntry(\'' + e.id + '\', \'day\')" style="cursor:pointer;"><div class="entry-name">' + escapeHtml(e.name) + '</div><div class="entry-portion">' + escapeHtml(e.portion) + '</div>' + nutrientLine(e) + '</div>';
         h += '<div class="entry-cals">' + e.calories + '</div>';
         h += '<button class="entry-del" onclick="deleteDayEntry(\'' + e.id + '\')">' + icon('trash') + '</button>';
         h += '</div>';
@@ -1151,6 +1206,25 @@ function renderDayDetailSheet() {
       });
       h += '</div>';
     }
+    if (state.dayWater > 0 || state.dayPoop > 0) {
+      h += '<div class="section-label" style="padding:0;">Wellness</div>';
+      h += '<div class="log">';
+      if (state.dayWater > 0) {
+        h += '<div class="entry">';
+        h += '<div class="activity-icon" style="font-size:20px;">\uD83D\uDCA7</div>';
+        h += '<div class="entry-info" onclick="openWaterEdit(\'day\')" style="cursor:pointer;"><div class="entry-name">' + state.dayWater + ' glass' + (state.dayWater === 1 ? '' : 'es') + ' of water</div><div class="entry-portion">day\'s total</div></div>';
+        h += '<button class="entry-del" onclick="clearDayWater()">' + icon('trash') + '</button>';
+        h += '</div>';
+      }
+      if (state.dayPoop > 0) {
+        h += '<div class="entry">';
+        h += '<div class="activity-icon" style="font-size:20px;">\uD83D\uDCA9</div>';
+        h += '<div class="entry-info" onclick="openPoopEdit(\'day\')" style="cursor:pointer;"><div class="entry-name">' + state.dayPoop + ' time' + (state.dayPoop === 1 ? '' : 's') + '</div><div class="entry-portion">day\'s total</div></div>';
+        h += '<button class="entry-del" onclick="clearDayPoop()">' + icon('trash') + '</button>';
+        h += '</div>';
+      }
+      h += '</div>';
+    }
   }
 
   h += '<div class="sheet-row" style="margin-top:16px;"><button class="btn btn-secondary" style="flex:1;" onclick="openAddFoodForDay()">+ Add food to this day</button></div>';
@@ -1165,7 +1239,7 @@ async function saveDayEntries() {
 }
 
 async function saveDayActivity() {
-  try { await kvSet('activity:' + state.profile + ':' + state.selectedDate, JSON.stringify({ activities: state.dayActivities, steps: state.daySteps })); }
+  try { await kvSet('activity:' + state.profile + ':' + state.selectedDate, JSON.stringify({ activities: state.dayActivities, steps: state.daySteps, water: state.dayWater, poop: state.dayPoop })); }
   catch(e) { console.error('save day activity failed', e); }
 }
 
@@ -1181,6 +1255,8 @@ function syncTodayStateIfSelectedIsToday() {
     state.entries = state.dayEntries;
     state.activities = state.dayActivities;
     state.steps = state.daySteps;
+    state.water = state.dayWater;
+    state.poop = state.dayPoop;
   }
 }
 
@@ -1208,6 +1284,50 @@ function clearDaySteps() {
   render();
 }
 
+function clearDayWater() {
+  state.dayWater = 0;
+  saveDayActivity();
+  syncTodayStateIfSelectedIsToday();
+  render();
+}
+
+function clearDayPoop() {
+  state.dayPoop = 0;
+  saveDayActivity();
+  syncTodayStateIfSelectedIsToday();
+  render();
+}
+
+const NUTRIENTS = [
+  { key: 'protein', src: 'protein_g', label: 'Protein', short: 'P', unit: 'g', dec: 0 },
+  { key: 'carbs', src: 'carbs_g', label: 'Carbs', short: 'C', unit: 'g', dec: 0 },
+  { key: 'calcium', src: 'calcium_mg', label: 'Calcium', short: 'Ca', unit: 'mg', dec: 0 },
+  { key: 'vitaminD', src: 'vitamin_d_mcg', label: 'Vitamin D', short: 'D', unit: 'mcg', dec: 1 }
+];
+function nutNum(v) { const n = parseFloat(v); return isFinite(n) && n > 0 ? n : 0; }
+function fmtNut(n, dec) { return (dec ? (Math.round(n * 10) / 10) : Math.round(n)).toLocaleString(); }
+function hasNutrients(e) { return e && NUTRIENTS.some(n => typeof e[n.key] === 'number'); }
+function nutrientsFromResult(r, pct) {
+  const o = {};
+  NUTRIENTS.forEach(n => { const v = nutNum(r[n.src]) * (pct / 100); o[n.key] = n.dec ? Math.round(v * 10) / 10 : Math.round(v); });
+  return o;
+}
+function sumNutrients(list) {
+  const t = {};
+  NUTRIENTS.forEach(n => { t[n.key] = list.reduce((s, e) => s + nutNum(e[n.key]), 0); });
+  return t;
+}
+function nutrientGridHtml(vals, id) {
+  let h = '<div class="nutrient-grid"' + (id ? ' id="' + id + '"' : '') + '>';
+  NUTRIENTS.forEach(n => {
+    h += '<div class="n-cell"><div class="n-val">' + fmtNut(nutNum(vals[n.key]), n.dec) + '<small>' + n.unit + '</small></div><div class="n-label">' + n.label + '</div></div>';
+  });
+  return h + '</div>';
+}
+function nutrientLine(e) {
+  if (!hasNutrients(e)) return '';
+  return '<div class="entry-nutrients">' + NUTRIENTS.map(n => n.short + ' ' + fmtNut(nutNum(e[n.key]), n.dec) + n.unit).join(' \u00b7 ') + '</div>';
+}
 function escapeHtml(s) {
   const d = document.createElement('div');
   d.textContent = s;
@@ -1264,6 +1384,7 @@ function renderResultSheet() {
     h += state.pendingImage ? ('<img src="' + state.pendingImage + '">') : ('<img src="' + RICE_EMOJI_URI + '" alt="described meal" style="width:64px;height:64px;border-radius:10px;object-fit:cover;">');
     h += '<div><div class="analyzed-portion">' + escapeHtml(r.portion_description) + '</div><div class="analyzed-cals" id="analyzedCalsDisplay">' + r.estimated_calories + ' kcal</div></div>';
     h += '</div>';
+    h += nutrientGridHtml(nutrientsFromResult(r, 100), 'analyzedNutrients');
     h += '<label>How much did you actually eat?</label>';
     h += '<div class="percent-row">';
     h += '<input type="range" id="portionPercentSlider" min="0" max="100" step="5" value="100" oninput="updatePortionPreview(this.value)">';
@@ -1364,6 +1485,18 @@ function setActivityTab(tab) {
 
 function clearSteps() {
   state.steps = 0;
+  saveActivity();
+  render();
+}
+
+function clearWater() {
+  state.water = 0;
+  saveActivity();
+  render();
+}
+
+function clearPoop() {
+  state.poop = 0;
   saveActivity();
   render();
 }
@@ -1557,6 +1690,12 @@ function renderEditEntrySheet() {
   h += '<input type="text" id="editEntryPortionInput" value="' + escapeHtml(e.portion) + '">';
   h += '<label>Calories</label>';
   h += '<input type="number" id="editEntryCaloriesInput" value="' + e.calories + '" inputmode="numeric">';
+  h += '<label>Nutrients (optional)</label>';
+  h += '<div class="nutrient-edit">';
+  NUTRIENTS.forEach(n => {
+    h += '<div><label style="margin-top:0;">' + n.label + ' (' + n.unit + ')</label><input type="number" id="editNut_' + n.key + '" step="' + (n.dec ? '0.1' : '1') + '" min="0" inputmode="decimal" placeholder="0" value="' + (typeof e[n.key] === 'number' ? e[n.key] : '') + '"></div>';
+  });
+  h += '</div>';
   h += '<label>Meal</label>';
   h += '<select id="editEntryMealInput">';
   [['breakfast','Breakfast'], ['lunch','Lunch'], ['dinner','Dinner'], ['snack','Snack']].forEach(m => {
@@ -1584,7 +1723,14 @@ function saveEditedEntry() {
   const list = state.editingSource === 'day' ? state.dayEntries : state.entries;
   const idx = list.findIndex(x => x.id === e.id);
   if (idx === -1) return;
-  list[idx] = Object.assign({}, list[idx], { name, portion, calories, mealType });
+  const nutVals = {};
+  let anyNut = hasNutrients(list[idx]);
+  NUTRIENTS.forEach(n => {
+    const raw = document.getElementById('editNut_' + n.key).value;
+    if (raw !== '') anyNut = true;
+    nutVals[n.key] = nutNum(raw);
+  });
+  list[idx] = Object.assign({}, list[idx], { name, portion, calories }, { mealType }, anyNut ? nutVals : {});
 
   if (state.editingSource === 'day') {
     saveDayEntries();
@@ -1719,6 +1865,78 @@ function saveEditedSteps() {
     saveActivity();
   }
   state.editingStepsSource = null;
+  closeSheet();
+}
+
+function openWaterEdit(source) {
+  state.editingStepsSource = source || 'today';
+  state.view = 'editWater';
+  render();
+}
+
+function renderEditWaterSheet() {
+  const val = state.editingStepsSource === 'day' ? state.dayWater : state.water;
+  let h = '<div class="overlay" onclick="closeSheetIfBackdrop(event)">';
+  h += '<div class="sheet">';
+  h += '<div class="sheet-title">Glasses of water</div>';
+  h += '<label>Total glasses</label>';
+  h += '<input type="number" id="editWaterInput" value="' + val + '" inputmode="numeric">';
+  h += '<div class="hint">This replaces the total for that day \u2014 enter your running count, not just new glasses.</div>';
+  h += '<div class="sheet-row">';
+  h += '<button class="btn btn-secondary" onclick="closeSheet()">Cancel</button>';
+  h += '<button class="btn btn-primary" onclick="saveEditedWater()">Save</button>';
+  h += '</div>';
+  h += '</div></div>';
+  return h;
+}
+
+function saveEditedWater() {
+  const val = parseInt(document.getElementById('editWaterInput').value, 10);
+  const water = (val && val > 0) ? val : 0;
+  if (state.editingStepsSource === 'day') {
+    state.dayWater = water;
+    saveDayActivity();
+    syncTodayStateIfSelectedIsToday();
+  } else {
+    state.water = water;
+    saveActivity();
+  }
+  closeSheet();
+}
+
+function openPoopEdit(source) {
+  state.editingStepsSource = source || 'today';
+  state.view = 'editPoop';
+  render();
+}
+
+function renderEditPoopSheet() {
+  const val = state.editingStepsSource === 'day' ? state.dayPoop : state.poop;
+  let h = '<div class="overlay" onclick="closeSheetIfBackdrop(event)">';
+  h += '<div class="sheet">';
+  h += '<div class="sheet-title">Times today</div>';
+  h += '<label>Total count</label>';
+  h += '<input type="number" id="editPoopInput" value="' + val + '" inputmode="numeric">';
+  h += '<div class="hint">This replaces the total for that day \u2014 enter your running count.</div>';
+  h += '<div class="sheet-row">';
+  h += '<button class="btn btn-secondary" onclick="closeSheet()">Cancel</button>';
+  h += '<button class="btn btn-primary" onclick="saveEditedPoop()">Save</button>';
+  h += '</div>';
+  h += '</div></div>';
+  return h;
+}
+
+function saveEditedPoop() {
+  const val = parseInt(document.getElementById('editPoopInput').value, 10);
+  const poop = (val && val > 0) ? val : 0;
+  if (state.editingStepsSource === 'day') {
+    state.dayPoop = poop;
+    saveDayActivity();
+    syncTodayStateIfSelectedIsToday();
+  } else {
+    state.poop = poop;
+    saveActivity();
+  }
   closeSheet();
 }
 
@@ -1866,7 +2084,7 @@ function retryAnalysis() {
 }
 
 function getFoodSystemPrompt() {
-  return "You are a nutrition estimator specialized in Filipino and wider Asian cuisine (Filipino, Chinese, Japanese, Korean, Thai, Vietnamese, Indonesian, Malaysian, Indian). Most photos you'll see are home-cooked or carinderia/hawker-style meals from these cuisines, so identify the specific dish by name rather than a generic description whenever you can \u2014 e.g. say 'chicken adobo' not 'braised meat', 'sinigang na baboy' not 'sour soup', 'pancit canton' not 'stir-fried noodles'.\n\nUse any visible container (rice bowl, plate, kanin cup, glass, mug, palayok/clay pot) as a scale reference for real-world portion size, factoring in depth and fill-level, not just top-down area. Keep these regional conventions in mind:\n- A standard Filipino rice cup/scoop of cooked rice is roughly 150-200g (about 190-260 kcal); many meals are served with 1-2 cups of rice on the side even if the rice is on a separate plate from the ulam (viand) \u2014 account for it if visible.\n- Filipino and Southeast Asian home cooking is often oil-, coconut milk-, or sugar-rich (adobo, kare-kare, bicol express, laing, lechon kawali, crispy pata, halo-halo, turon) \u2014 don't lowball calorie density just because a dish looks like 'just vegetables' or 'just soup'; sauces and frying matter a lot.\n- Common high-calorie-density items to calibrate against: lechon/lechon kawali and crispy pata (very high, deep-fried pork), sisig (fatty, oily), kare-kare (peanut sauce, rich), halo-halo and taho (added sugar/syrup), pancit and lumpia (oil-fried or oil-tossed).\n- Lighter/lower-density reference points: sinigang and tinola broths (mostly water-based, lower calorie unless very meat-heavy), fresh lumpia (unfried), steamed fish, most vegetable-forward ulam.\n- For other Asian cuisine, calibrate similarly: ramen and pho broths are moderate, curries and fried rice are dense, sushi/sashimi is lighter per piece but rice adds up, dumplings and fried items are dense.\n- If multiple dishes/components are visible on one plate (e.g. rice + ulam + a side), estimate each component's contribution and sum them into one total, and mention the components in the portion description.\n- The user may provide additional details the photo can't show, such as ingredient substitutions (e.g. Splenda or another sugar substitute instead of regular sugar, a lower-fat version of an ingredient, a different cooking method). When given, treat this as ground truth and adjust the estimate accordingly \u2014 e.g. a sugar substitute with negligible calories should meaningfully lower the total versus a regular-sugar assumption.\n\nRespond with ONLY a raw JSON object, no markdown fences, no commentary, in exactly this shape: {\"food_name\": string (use the specific local/regional dish name when recognizable), \"portion_description\": string describing the estimated size/volume, container, and any components summed together, \"estimated_calories\": integer, \"confidence\": \"high\" | \"medium\" | \"low\"}. If the image does not clearly show food or drink, set food_name to \"Not recognized\" and estimated_calories to 0.";
+  return "You are a nutrition estimator specialized in Filipino and wider Asian cuisine (Filipino, Chinese, Japanese, Korean, Thai, Vietnamese, Indonesian, Malaysian, Indian). Most photos you'll see are home-cooked or carinderia/hawker-style meals from these cuisines, so identify the specific dish by name rather than a generic description whenever you can \u2014 e.g. say 'chicken adobo' not 'braised meat', 'sinigang na baboy' not 'sour soup', 'pancit canton' not 'stir-fried noodles'.\n\nUse any visible container (rice bowl, plate, kanin cup, glass, mug, palayok/clay pot) as a scale reference for real-world portion size, factoring in depth and fill-level, not just top-down area. Keep these regional conventions in mind:\n- A standard Filipino rice cup/scoop of cooked rice is roughly 150-200g (about 190-260 kcal); many meals are served with 1-2 cups of rice on the side even if the rice is on a separate plate from the ulam (viand) \u2014 account for it if visible.\n- Filipino and Southeast Asian home cooking is often oil-, coconut milk-, or sugar-rich (adobo, kare-kare, bicol express, laing, lechon kawali, crispy pata, halo-halo, turon) \u2014 don't lowball calorie density just because a dish looks like 'just vegetables' or 'just soup'; sauces and frying matter a lot.\n- Common high-calorie-density items to calibrate against: lechon/lechon kawali and crispy pata (very high, deep-fried pork), sisig (fatty, oily), kare-kare (peanut sauce, rich), halo-halo and taho (added sugar/syrup), pancit and lumpia (oil-fried or oil-tossed).\n- Lighter/lower-density reference points: sinigang and tinola broths (mostly water-based, lower calorie unless very meat-heavy), fresh lumpia (unfried), steamed fish, most vegetable-forward ulam.\n- For other Asian cuisine, calibrate similarly: ramen and pho broths are moderate, curries and fried rice are dense, sushi/sashimi is lighter per piece but rice adds up, dumplings and fried items are dense.\n- If multiple dishes/components are visible on one plate (e.g. rice + ulam + a side), estimate each component's contribution and sum them into one total, and mention the components in the portion description.\n- The user may provide additional details the photo can't show, such as ingredient substitutions (e.g. Splenda or another sugar substitute instead of regular sugar, a lower-fat version of an ingredient, a different cooking method). When given, treat this as ground truth and adjust the estimate accordingly \u2014 e.g. a sugar substitute with negligible calories should meaningfully lower the total versus a regular-sugar assumption.\n\nAlso estimate four nutrients for the same total portion as the calories: protein in grams (protein_g), total carbohydrates in grams (carbs_g), calcium in milligrams (calcium_mg), and vitamin D in micrograms (vitamin_d_mcg, not IU). Use realistic values for the dish as cooked and served: rice and noodles are carb-heavy, meat and fish carry the protein, most home-cooked Filipino dishes have little vitamin D unless they include fish, egg, or fortified milk, and calcium comes mainly from dairy, small bony fish, tofu, and leafy greens. Use 0 when a nutrient is negligible, and round protein/carbs/calcium to whole numbers and vitamin D to one decimal.\n\nRespond with ONLY a raw JSON object, no markdown fences, no commentary, in exactly this shape: {\"food_name\": string (use the specific local/regional dish name when recognizable), \"portion_description\": string describing the estimated size/volume, container, and any components summed together, \"estimated_calories\": integer, \"protein_g\": number, \"carbs_g\": number, \"calcium_mg\": number, \"vitamin_d_mcg\": number, \"confidence\": \"high\" | \"medium\" | \"low\"}. If the image does not clearly show food or drink, set food_name to \"Not recognized\" and estimated_calories to 0.";
 }
 
 async function analyzeImage(dataUrl, note) {
@@ -2042,6 +2260,8 @@ function updatePortionPreview(percent) {
   if (display && state.pendingResult) {
     const adjusted = Math.round(state.pendingResult.estimated_calories * (percent / 100));
     display.textContent = adjusted + ' kcal';
+    const grid = document.getElementById('analyzedNutrients');
+    if (grid) grid.outerHTML = nutrientGridHtml(nutrientsFromResult(state.pendingResult, parseInt(percent, 10)), 'analyzedNutrients');
   }
 }
 
@@ -2057,7 +2277,7 @@ function confirmAddEntry() {
   const portionNote = percent !== 100
     ? r.portion_description + ' \u2014 ' + percent + '% eaten'
     : r.portion_description;
-  const newEntry = {
+  const newEntry = Object.assign({
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     name: finalName,
     portion: portionNote,
@@ -2065,7 +2285,7 @@ function confirmAddEntry() {
     mealType: mealType,
     thumb: state.pendingImage,
     time: Date.now()
-  };
+  }, nutrientsFromResult(r, percent));
 
   if (state.addEntryContext) {
     state.dayEntries.push(newEntry);
@@ -2106,6 +2326,14 @@ window.saveEditedActivity = saveEditedActivity;
 window.deleteEditingActivity = deleteEditingActivity;
 window.openEditSteps = openEditSteps;
 window.saveEditedSteps = saveEditedSteps;
+window.openWaterEdit = openWaterEdit;
+window.saveEditedWater = saveEditedWater;
+window.clearWater = clearWater;
+window.clearDayWater = clearDayWater;
+window.openPoopEdit = openPoopEdit;
+window.saveEditedPoop = saveEditedPoop;
+window.clearPoop = clearPoop;
+window.clearDayPoop = clearDayPoop;
 window.switchPage = switchPage;
 window.prevMonth = prevMonth;
 window.nextMonth = nextMonth;
